@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { CustomerField, CustomersTableType, InvoiceForm, InvoicesTable, LatestInvoiceRaw, Revenue, } from './definitions';
+import { CustomerField, CustomersTableType, InvoiceForm, InvoicesTable, LatestInvoiceRaw, Revenue, MPinit } from './definitions';
 import { formatCurrency } from './utils';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
@@ -79,10 +79,7 @@ export async function fetchCardData() {
 }
 
 const ITEMS_PER_PAGE = 6;
-export async function fetchFilteredInvoices(
-  query: string,
-  currentPage: number,
-) {
+export async function fetchFilteredInvoices( query: string, currentPage: number, ) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
   try {
@@ -208,4 +205,48 @@ export async function fetchFilteredCustomers(query: string) {
     console.error('Database Error:', err);
     throw new Error('Failed to fetch customer table.');
   }
+}
+
+export const fetchPostalCode = async (val:string): Promise<MPinit | undefined> => {
+
+  let postal = val.toUpperCase().split(' ').join('')
+    try {
+        const r = await fetch(`https://represent.opennorth.ca/postcodes/${postal}/`);
+        if (r.ok) {
+          const response = await r.json()
+          const data = formatPostalData(response) as MPinit
+          return data;
+        }
+    } catch (err) { 
+      console.error('Error:', err);
+      throw new Error('Failed to locate postal code');
+    }
+}
+
+const formatPostalData = (val:any):MPinit => {
+    const rep = val.representatives_centroid.filter((el: any) => el.elected_office == 'MP')[0]
+    let mp:MPinit = { 
+      name: rep.name, 
+      party: rep.party_name, 
+      district: rep.district_name, 
+      email: rep.email, 
+      photoURL: rep.photo_url, 
+      address: rep.offices 
+    }
+    return mp;
+}
+
+export const fetchMP = async (name:string) => {
+  let nameEncode = name.toLowerCase().split(" ").join("-")
+  let nameURL = `/politicians/${nameEncode}/?format=json`
+  try {
+    const r = await fetch(`https://api.openparliament.ca${nameURL}`)
+    if (r.ok) {
+      const response = await r.json();
+      console.log(response)
+    }
+    } catch (err) { 
+      console.error('Error:', err);
+      throw new Error('Failed to fetch MP');
+     }
 }

@@ -86,3 +86,29 @@ export type InvoiceForm = {
   amount: number;
   status: 'pending' | 'paid';
 };
+
+export type MPinit = {
+  name: string;
+  party: string;
+  district: string;
+  email: string;
+  photoURL: string;
+  address: { 
+    fax: string;
+    postal: string;
+    tel: string;
+    type: string
+  }[];
+};
+
+export type MPadd = {
+  name: string;
+  district: string;
+  email: string;
+  address: { 
+    fax: string;
+    postal: string;
+    tel: string;
+    type: string
+  }[];
+};
