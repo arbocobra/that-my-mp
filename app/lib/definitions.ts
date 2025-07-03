@@ -86,3 +86,46 @@ export type InvoiceForm = {
   amount: number;
   status: 'pending' | 'paid';
 };
+
+export type MPinit = {
+  last: string;
+  name: string;
+  party: string;
+  district: string;
+  email: string;
+  photoURL: string;
+  address: { 
+    fax: string;
+    postal: string;
+    tel: string;
+    type: string
+  }[];
+  ballotsURL?: string;
+  sponsoredURL?: string;
+  link?: string;
+  membership?: object[];
+};
+
+export type MPadd = {
+  ballotsURL: string;
+  sponsoredURL: string;
+  link: string;
+  membership: object[];
+};
+
+export type Ballot = {
+  response: string;
+  voteURL: string;
+}
+
+export type Vote = {
+  billURL: string;
+  voteURL: string;
+  result: string;
+  date: string;
+  description: string;
+  session: string;
+  number: string;
+  contextURL: string; 
+  response?: string;
+}
