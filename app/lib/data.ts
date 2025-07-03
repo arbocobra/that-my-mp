@@ -1,6 +1,8 @@
 import postgres from 'postgres';
-import { CustomerField, CustomersTableType, InvoiceForm, InvoicesTable, LatestInvoiceRaw, Revenue, MPinit } from './definitions';
+import { CustomerField, CustomersTableType, InvoiceForm, InvoicesTable, LatestInvoiceRaw, Revenue, MPinit, MPadd, Ballot, Vote } from './definitions';
 import { formatCurrency } from './utils';
+import Ballots from '../ui/results/ballots';
+import assert from 'node:assert';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -10,7 +12,7 @@ export async function fetchRevenue() {
     // Don't do this in production :)
 
     // console.log('Fetching revenue data...');
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const data = await sql<Revenue[]>`SELECT * FROM revenue`;
 
@@ -207,15 +209,38 @@ export async function fetchFilteredCustomers(query: string) {
   }
 }
 
-export const fetchPostalCode = async (val:string): Promise<MPinit | undefined> => {
+export const getMPByPostalCode = async (val:string):Promise<MPinit> => {
+  const response = await fetchPostalCode(val)
+  assertIsDefined(response)
+  return response
+}
 
+export const getMP = async (val:MPinit):Promise<MPinit> =>{
+  const response = await fetchMP(val)
+  assertIsDefined(response)
+  return response
+}
+
+export const getVotes = async (date:string):Promise<Vote[]> => {
+  const response = await fetchVotesByDate(date);
+  assertIsDefined(response)
+  return response
+}
+
+export const getBallots = async (url:string):Promise<object[]> => {
+  const response = await fetchBallots(url)
+  assertIsDefined(response)
+  return response;
+}
+
+const fetchPostalCode = async (val:string): Promise<MPinit | undefined> => {
   let postal = val.toUpperCase().split(' ').join('')
     try {
         const r = await fetch(`https://represent.opennorth.ca/postcodes/${postal}/`);
         if (r.ok) {
           const response = await r.json()
           const data = formatPostalData(response) as MPinit
-          return data;
+          return data as MPinit;
         }
     } catch (err) { 
       console.error('Error:', err);
@@ -226,7 +251,8 @@ export const fetchPostalCode = async (val:string): Promise<MPinit | undefined> =
 const formatPostalData = (val:any):MPinit => {
     const rep = val.representatives_centroid.filter((el: any) => el.elected_office == 'MP')[0]
     let mp:MPinit = { 
-      name: rep.name, 
+      last: rep.last_name,
+      name: rep.name,
       party: rep.party_name, 
       district: rep.district_name, 
       email: rep.email, 
@@ -236,17 +262,222 @@ const formatPostalData = (val:any):MPinit => {
     return mp;
 }
 
-export const fetchMP = async (name:string) => {
+export const fetchMP = async (val:MPinit):Promise<MPinit | undefined> => {
+  let name = val.name
+  let last = val.last
   let nameEncode = name.toLowerCase().split(" ").join("-")
   let nameURL = `/politicians/${nameEncode}/?format=json`
+  let response;
   try {
-    const r = await fetch(`https://api.openparliament.ca${nameURL}`)
-    if (r.ok) {
-      const response = await r.json();
-      console.log(response)
+    let r = await MPlookup(nameURL)
+    if (!r.ok) {
+      const lastnameSearch = `/politicians/?family_name=${last}&format=json`
+      let altR = await MPlookup(lastnameSearch)
+      if (altR.ok) {
+        let altResp = await altR.json();
+        let altURL = altResp.objects[0].url
+        let r2 = await MPlookup(`${altURL}?format=json`)
+        if (r2.ok) {
+          response = await r2.json();
+        }
+      }
+    } else {
+      response = await r.json();
     }
+    const data = formatMPData(response, val)
+    return data;
     } catch (err) { 
       console.error('Error:', err);
       throw new Error('Failed to fetch MP');
      }
+}
+
+// export const fetchMP = async (name:string, last:string):Promise<MPadd | undefined> => {
+//   let nameEncode = name.toLowerCase().split(" ").join("-")
+//   let nameURL = `/politicians/${nameEncode}/?format=json`
+//   let response;
+//   try {
+//     let r = await MPlookup(nameURL)
+//     if (!r.ok) {
+//       const lastnameSearch = `/politicians/?family_name=${last}&format=json`
+//       let altR = await MPlookup(lastnameSearch)
+//       if (altR.ok) {
+//         let altResp = await altR.json();
+//         let altURL = altResp.objects[0].url
+//         let r2 = await MPlookup(`${altURL}?format=json`)
+//         if (r2.ok) {
+//           response = await r2.json();
+//         }
+//       }
+//     } else {
+//       response = await r.json();
+//     }
+//     const data = formatMPData(response) as MPadd
+//     return data;
+//     } catch (err) { 
+//       console.error('Error:', err);
+//       throw new Error('Failed to fetch MP');
+//      }
+// }
+
+const MPlookup = async (url:string):Promise<any | undefined> => {
+  const baseURL = 'https://api.openparliament.ca'
+  const r = await fetch(`${baseURL}${url}`)
+  return r  
+}
+
+// const formatMPData = (val:any):MPadd => {
+//   const membership:object[] = val.memberships.map((el: any) => {
+//     return { 'startDate': el.start_date, 'endDate': el.end_date }
+//   })
+//   let mp:MPadd = { 
+//     ballotsURL: val.related.ballots_url, 
+//     sponsoredURL: val.related.sponsored_bills_url, 
+//     link: val.links[0], 
+//     membership: membership
+//   }
+//   return mp;
+// }
+
+const formatMPData = (val:any, init:MPinit):MPinit => {
+  const membership:object[] = val.memberships.map((el: any) => {
+    return { 'startDate': el.start_date, 'endDate': el.end_date }
+  })
+  let mp:any = { 
+    ballotsURL: val.related.ballots_url, 
+    sponsoredURL: val.related.sponsored_bills_url, 
+    link: val.links[0], 
+    membership: membership
+  }
+  let final:MPinit = Object.assign(mp, init)
+  return final;
+}
+
+export const fetchVotesByDate = async (date:string):Promise<Vote[] | undefined> => {
+  const response = []
+  try {
+    // let r = await fetch('https://api.openparliament.ca/votes/?date__gte=2019-10-21&limit=500&format=json')
+    let r = await fetch(`https://api.openparliament.ca/votes/?date__gte=${date}&limit=500&format=json`)
+    if (r.ok) {
+      let resp = await r.json();
+      response.push(resp.objects)
+      let next = resp.pagination.next_url
+      let i = 0
+      while (next && i < 9) {
+        let rr = await fetch('https://api.openparliament.ca' + next)
+        if (rr.ok) {
+          let rresp = await rr.json();
+          response.push(rresp.objects)
+          next = rresp.pagination.next_url
+          i++
+        }
+      }
+      let output = formatVoteByDate(response)
+      return output as Vote[];
+    }
+  } catch (err) { 
+    console.error('Error:', err);
+    throw new Error('Failed to fetch MP');
+  }
+}
+
+const formatVoteByDate = (val:any):Vote[] => {
+  let flat = val.flat()
+  let filtered:Vote[] = []
+  flat.forEach((el:any) => {
+    if (el.bill_url) {
+      let vote:Vote = {
+        billURL: el.bill_url,
+        voteURL: el.url,
+        result: el.result,
+        date: el.date,
+        description: el.description.en,
+        session: el.session,
+        number: el.number,
+        contextURL: el.context_statement
+      }
+      filtered.push(vote)
+    }
+  })
+  return filtered 
+}
+
+export const fetchBallots = async (url:string):Promise<object[] | undefined> => {
+  let ballotsURL = `${url}&limit=500&format=json`
+    const response = []
+    try {
+        let r = await fetch(`https://api.openparliament.ca${ballotsURL}`)
+        if (r.ok) {
+          let resp = await r.json();
+          response.push(resp.objects)
+          let next = resp.pagination.next_url
+          let i = 0
+          while (next && i < 9) {
+           let rr = await fetch('https://api.openparliament.ca' + next)
+          if (rr.ok) {
+            let rresp = await rr.json();
+            response.push(rresp.objects)
+            next = rresp.pagination.next_url
+            i++
+          }
+        }
+        let output = response.flat();
+        assertIsDefined(output)
+        // return output as Ballot[]
+        return output
+      }
+    } catch (err) { 
+      console.error('Error:', err);
+      throw new Error('Failed to fetch MP');
+     }
+}
+
+const formatBallots = (val:any):Ballot[] => {
+  let flat = val.flat()
+  let ballots = flat.map((el:any) => {
+    let b:Ballot = {
+      response: el.ballot,
+      voteURL: el.vote_urls
+    }
+    return b
+  })
+  return ballots;
+}
+
+export const matchVotesBills = (mp_ballots:any[], allBill_votes:Vote[]):Vote[] => {
+  // assert(typeof mp_ballots[0] === Object<Ballot>);
+  // assertIsDefined(allBill_votes)
+  // mp_ballots > allBill_votes
+  const ballotVote_urls:string[] = mp_ballots.map((b:any) => b.vote_url)
+
+  let filtered:Vote[] = [];
+
+  allBill_votes.forEach((v:Vote, i:number) => {
+    let ballotIndex = ballotVote_urls.indexOf(v.voteURL)
+    if (ballotIndex >= 0) {
+      let current = {...v}
+      let ballotResponse:string = mp_ballots[ballotIndex].ballot
+      current.response = ballotResponse
+      filtered.push(current)
+    }
+  })
+
+  // let filtered:Vote[] = allBill_votes.map((v:Vote, i:number) => {
+  //   // assertIsDefined(v)
+  //   let ballotIndex = ballotVote_urls.indexOf(v.voteURL)
+  //   if (ballotIndex > 0) {
+  //     let ballotResponse:string = mp_ballots[ballotIndex].ballot
+  //     v.response = ballotResponse
+  //     return v as Vote;
+  //   }
+  // })
+
+  return filtered
+
+}
+
+function assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
+  if (value === undefined || value === null) {
+    throw new Error(`${value} is not defined`)
+  }
 }

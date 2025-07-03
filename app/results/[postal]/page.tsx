@@ -1,13 +1,12 @@
 import ContactInfo from '@/app/ui/results/contact';
 import Picture from '@/app/ui/results/picture';
-import LatestInvoices from '@/app/ui/dashboard/latest-invoices';
 import Ballots from '@/app/ui/results/ballots';
 import { lexend } from '@/app/ui/fonts';
 import { Suspense } from 'react';
 import CardWrapper from '@/app/ui/dashboard/cards';
 import { ContactSkeleton, BallotsSkeleton, PictureSkeleton, CardsSkeleton } from '@/app/ui/skeletons';
 import { Metadata } from 'next';
-import { fetchPostalCode, fetchMP } from '@/app/lib/data';
+import { getMPByPostalCode } from '@/app/lib/data';
 import { notFound } from 'next/navigation';
 
 export const metadata: Metadata = {
@@ -16,14 +15,15 @@ export const metadata: Metadata = {
 
 const Page = async (props: { params: Promise<{ postal: string }> }) => {
 
+   // const path = usePathname()
+   // const router = useRouter()
+   // console.log(path)
+   // console.log(router)
+
    const params = await props.params;
    const postal = params.postal;
 
-   // const [valA, valB] = await Promise.all([
-   //     fetchMP(postal)
-   // ]);
-
-   const data = await fetchPostalCode(postal)
+   const data = await getMPByPostalCode(postal)
 
    if (!data) { notFound() }
 
@@ -41,6 +41,7 @@ const Page = async (props: { params: Promise<{ postal: string }> }) => {
         <Suspense fallback={<BallotsSkeleton />}>
           <Ballots data={data} />
         </Suspense>
+        {/* <Ballots data={data} /> */}
         <Suspense fallback={<ContactSkeleton />}>
           <ContactInfo data={data} />
         </Suspense>

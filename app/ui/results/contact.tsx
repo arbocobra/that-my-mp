@@ -21,9 +21,9 @@ const ContactInfo = async (props: {data: any}) => {
         <div className="flex flex-col rounded-md bg-white p-4">
           <div>Email: {email}</div>
         </div>
-        { address.length && address.map((a:Address) => (
+        { address.length && address.map((a:Address, i:number) => (
 
-            <div className="mt-6 flex flex-col rounded-md bg-white p-4">
+            <div key={`address-${i}`} className="mt-6 flex flex-col rounded-md bg-white p-4">
                <div>
                   {a.type} Address
                </div>
