@@ -29,11 +29,11 @@ const Page = async (props: { params: Promise<{ postal: string }> }) => {
 
    return (
     <main>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Suspense fallback={<CardsSkeleton />}>
           <CardWrapper />
         </Suspense>
-      </div>
+      </div> */}
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4 lg:grid-cols-10">
         <Suspense fallback={<PictureSkeleton />}>
           <Picture photoURL={data.photoURL} />
