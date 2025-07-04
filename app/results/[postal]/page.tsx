@@ -3,7 +3,7 @@ import Picture from '@/app/ui/results/picture';
 import Ballots from '@/app/ui/results/ballots';
 import { lexend } from '@/app/ui/fonts';
 import { Suspense } from 'react';
-import CardWrapper from '@/app/ui/dashboard/cards';
+// import CardWrapper from '@/app/ui/dashboard/cards';
 import { ContactSkeleton, BallotsSkeleton, PictureSkeleton, CardsSkeleton } from '@/app/ui/skeletons';
 import { Metadata } from 'next';
 import { getMPByPostalCode } from '@/app/lib/data';
